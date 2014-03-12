@@ -200,7 +200,11 @@ idevice_error_t idevice_connection_sendfile(idevice_connection_t connection, int
  * @return IDEVICE_E_SUCCESS if ok, otherwise an error code.
  */
 idevice_error_t idevice_connection_receive_timeout(idevice_connection_t connection, char *data, uint32_t len, uint32_t *recv_bytes, unsigned int timeout);
-	
+
+
+idevice_error_t idevice_connection_sendfile(idevice_connection_t connection, int fd, off_t length, off_t *sent_bytes);
+
+
 /**
  * Receive data from a device via the given connection.
  * This function is like idevice_connection_receive_timeout, but with a
