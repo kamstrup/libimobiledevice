@@ -234,6 +234,8 @@ afc_error_t afc_file_read(afc_client_t client, uint64_t handle, char *data, uint
  */
 afc_error_t afc_file_write(afc_client_t client, uint64_t handle, const char *data, uint32_t length, uint32_t *bytes_written);
 
+afc_error_t afc_file_write_from_fd(afc_client_t client, uint64_t handle, int fd, off_t length, off_t *bytes_written);
+
 /**
  * Seeks to a given position of a pre-opened file on the device.
  *
