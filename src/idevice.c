@@ -395,7 +395,7 @@ idevice_error_t idevice_connection_sendfile(idevice_connection_t connection, int
         length = st.st_size;
     }
 
-    conn_fd = (int)connection->data;
+    conn_fd = (int)(long)connection->data;
     errno = 0;
 
 #ifdef __APPLE__
