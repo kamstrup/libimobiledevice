@@ -796,7 +796,7 @@ afc_error_t afc_file_write_from_fd(afc_client_t client, uint64_t handle, int fd,
 
     afc_unlock(client);
 
-    return dret == IDEVICE_E_SUCCESS ? AFC_E_SUCCESS : AFC_E_IO_ERROR;
+    return AFC_E_SUCCESS;
 }
 
 /**
