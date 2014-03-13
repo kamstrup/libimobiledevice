@@ -937,6 +937,13 @@ afc_error_t afc_file_write_from_fd(afc_client_t client, uint64_t handle, int fd,
     }
 
     dret = idevice_connection_sendfile(client->parent->connection, fd, length, bytes_written);
+    if (dret != IDEVICE_E_SUCCESS) {
+        afc_unlock(client);
+        debug_info("Failed to send payload from fd %d: %s", fd, strerror(errno));
+        return AFC_E_IO_ERROR;
+    }
+
+    ret = afc_receive_data(client, NULL, &packet_bytes_sent);
 
     afc_unlock(client);
 
