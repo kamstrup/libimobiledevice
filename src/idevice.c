@@ -795,6 +795,9 @@ idevice_error_t idevice_connection_enable_ssl(idevice_connection_t connection)
 	pair_record_import_crt_with_name(pair_record, USERPREF_ROOT_CERTIFICATE_KEY, &root_cert);
 	pair_record_import_key_with_name(pair_record, USERPREF_ROOT_PRIVATE_KEY_KEY, &root_privkey);
 
+	if (pair_record)
+		plist_free(pair_record);
+
 	/* Set up OpenSSL */
 	if (openssl_init_done == 0) {
 		SSL_library_init();
@@ -883,6 +886,9 @@ idevice_error_t idevice_connection_enable_ssl(idevice_connection_t connection)
 	pair_record_import_crt_with_name(pair_record, USERPREF_HOST_CERTIFICATE_KEY, ssl_data_loc->host_cert);
 	pair_record_import_key_with_name(pair_record, USERPREF_ROOT_PRIVATE_KEY_KEY, ssl_data_loc->root_privkey);
 	pair_record_import_key_with_name(pair_record, USERPREF_HOST_PRIVATE_KEY_KEY, ssl_data_loc->host_privkey);
+
+	if (pair_record)
+		plist_free(pair_record);
 
 	debug_info("GnuTLS step 1...");
 	gnutls_transport_set_ptr(ssl_data_loc->session, (gnutls_transport_ptr_t)connection);
