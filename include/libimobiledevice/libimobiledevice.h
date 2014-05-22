@@ -182,6 +182,8 @@ idevice_error_t idevice_disconnect(idevice_connection_t connection);
  */
 idevice_error_t idevice_connection_send(idevice_connection_t connection, const char *data, uint32_t len, uint32_t *sent_bytes);
 
+idevice_error_t idevice_connection_sendfile(idevice_connection_t connection, int fd, off_t length, off_t *sent_bytes);
+
 /**
  * Receive data from a device via the given connection.
  * This function will return after the given timeout even if no data has been

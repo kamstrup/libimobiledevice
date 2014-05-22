@@ -127,6 +127,20 @@ static void __attribute__((destructor)) libimobiledevice_deinitialize(void)
 }
 #endif
 
+/* sendfile support for Apple+Linux.
+ * Other OSes fall back to read/write */
+#ifdef __APPLE__
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/uio.h>
+#include <sys/stat.h>
+#elif __linux
+#include <sys/sendfile.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
 static idevice_event_cb_t event_cb = NULL;
 
 static void usbmux_event_cb(const usbmuxd_event_t *event, void *user_data)
@@ -342,6 +356,99 @@ idevice_error_t idevice_connection_send(idevice_connection_t connection, const c
 		return IDEVICE_E_SSL_ERROR;
 	}
 	return internal_connection_send(connection, data, len, sent_bytes);
+}
+
+/**
+ * Send data from a file over the connection.
+ *
+ * This method is more efficient than regular read/write calls as it will
+ * avoid copying data to user space, but let the kernel handle the memory
+ * paging directly.
+ *
+ * For systems that do not support the sendfile() syscall this call will
+ * fall back to regular read/write IO.
+ *
+ * @param connection The connection to send data over
+ * @param fd File descriptor to send data from. Must be a regular file.
+ *   If the operation succeeds the file descriptors position will be advanced.
+ * @param length Number of bytes to send from fd. If 0 is passed the full file will be sent.
+ * @param sent_bytes Return location to store the total number of bytes sent.
+ *
+ * @return IDEVICE_E_SUCCESS if ok, otherwise an error code.
+ */
+idevice_error_t idevice_connection_sendfile(idevice_connection_t connection, int fd, off_t length, off_t *sent_bytes)
+{
+    struct stat st;
+    int conn_fd;
+
+    if (!connection) {
+        return IDEVICE_E_INVALID_ARG;
+    }
+
+    fstat(fd, &st);
+    if (!S_ISREG(st.st_mode)) {
+        debug_info("ERROR: Unable to use sendfile() input fd is not a regular file");
+        return IDEVICE_E_INVALID_ARG;
+    }
+
+    if (length == 0) {
+        length = st.st_size;
+    }
+
+    conn_fd = (int)(long)connection->data;
+    errno = 0;
+
+#ifdef __APPLE__
+    // int sendfile(int fd, int s, off_t offset, off_t *len, struct sf_hdtr *hdtr, int flags);
+    off_t len = length;
+    int result = sendfile(fd, conn_fd, 0, &len, NULL, 0);
+    *sent_bytes = len;
+    if (result == 0) {
+        // FIXME: check errno
+        return IDEVICE_E_SUCCESS;
+    } else {
+        debug_info("ERROR: When calling sendfile(%d, %d, 0, %d) __APPLE__: %s", fd, conn_fd, length, strerror(errno));
+        return IDEVICE_E_UNKNOWN_ERROR;
+    }
+#elif __linux
+    // ssize_t sendfile(int out_fd, int in_fd, off_t * offset, size_t count);
+    ssize_t len = sendfile(conn_fd, fd, NULL, length);
+    *sent_bytes = len;
+    if (len >= 0) {
+        return IDEVICE_E_SUCCESS;
+    } else {
+        debug_info("ERROR: When calling sendfile(%d, %d, NULL, %d) __linux: %s", conn_fd, fd, length, strerror(errno));
+        return IDEVICE_E_UNKNOWN_ERROR;
+    }
+#else
+    char buf[4096 * 10];
+    ssize_t num_read;
+
+    while ((num_read = read(fd, (void *) buf, sizeof(buf)) > 0) {
+        ssize_t num_written = 0;
+        while ((num_written = write(conn_fd, ((void *) buf) + num_written, num_read)) > 0) {
+            num_read -= num_written;
+            if (num_read == 0) {
+                break;
+            } else if (num_read < 0) {
+                debug_info("ERROR: internal error in "__func__". Wrote more than we read!");
+                return IDEVICE_E_UNKNOWN_ERROR;
+            }
+        }
+        if (num_written < 0) {
+           debug_info("ERROR: write(%d,,): %s", conn_fd, strerror(errno));
+           return IDEVICE_E_UNKNOWN_ERROR;
+        }
+    }
+
+    if (num_read == 0) {
+        return IDEVICE_E_SUCCESS;
+    } else (num_read < 0) {
+        // must be a read error, write errors return from inner while loop
+        debug_info("ERROR: read(%d,,): %s", fd, strerror(errno));
+        return IDEVICE_E_UNKNOWN_ERROR;
+    }
+#endif
 }
 
 /**
