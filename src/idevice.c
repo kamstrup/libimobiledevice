@@ -426,7 +426,7 @@ idevice_error_t idevice_connection_sendfile(idevice_connection_t connection, int
 
     while ((num_read = read(fd, (void *) buf, sizeof(buf)) > 0) {
         ssize_t num_written = 0;
-        while ((num_written = write(conn_fd, ((void *) buf) + num_written, num_read)) > 0) {
+        while ((num_written = write(conn_fd, (void *) (buf + num_written), num_read)) > 0) {
             num_read -= num_written;
             if (num_read == 0) {
                 break;
