@@ -182,6 +182,25 @@ idevice_error_t idevice_disconnect(idevice_connection_t connection);
  */
 idevice_error_t idevice_connection_send(idevice_connection_t connection, const char *data, uint32_t len, uint32_t *sent_bytes);
 
+/**
+ * Send data from a file over the connection.
+ *
+ * This method is more efficient than regular read/write calls as it will
+ * avoid copying data to user space, but let the kernel handle the memory
+ * paging directly.
+ *
+ * For systems that do not support the sendfile() syscall (Windows in particular)
+ * this call will fall back to regular read/write IO.
+ *
+ * @param connection The connection to send data over
+ * @param fd File descriptor to send data from. Must be a regular file.
+ *   If the operation succeeds the file descriptors position will be advanced.
+ * @param length Number of bytes to send from fd. If 0 is passed the full file will be sent.
+ * @param sent_bytes Return location to store the total number of bytes sent.
+ *
+ * @return IDEVICE_E_SUCCESS if ok, otherwise an error code.
+ */
+
 idevice_error_t idevice_connection_sendfile(idevice_connection_t connection, int fd, off_t length, off_t *sent_bytes);
 
 /**
