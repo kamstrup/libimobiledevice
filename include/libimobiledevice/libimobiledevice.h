@@ -187,7 +187,9 @@ idevice_error_t idevice_connection_send(idevice_connection_t connection, const c
  *
  * This method is more efficient than regular read/write calls as it will
  * avoid copying data to user space, but let the kernel handle the memory
- * paging directly.
+ * paging directly. It may not necessarily be much faster than regular
+ * writing (although it can be), but it will put noticably smaller load
+ * on the system when transfering files this way.
  *
  * For systems that do not support the sendfile() syscall (Windows in particular)
  * this call will fall back to regular read/write IO.
@@ -200,7 +202,6 @@ idevice_error_t idevice_connection_send(idevice_connection_t connection, const c
  *
  * @return IDEVICE_E_SUCCESS if ok, otherwise an error code.
  */
-
 idevice_error_t idevice_connection_sendfile(idevice_connection_t connection, int fd, off_t length, off_t *sent_bytes);
 
 /**
