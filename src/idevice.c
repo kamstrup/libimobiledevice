@@ -421,12 +421,17 @@ idevice_error_t idevice_connection_sendfile(idevice_connection_t connection, int
         return IDEVICE_E_UNKNOWN_ERROR;
     }
 #else
-    char buf[4096 * 10];
-    ssize_t num_read;
+    // 10 pages of memory gives close to optimum performance,
+    // while not being too aggresive on memory consumption
+    char     stack_buf[4096 * 10];
+    char    *buf = &stack_buf[0];
+    ssize_t  num_read;
 
-    while ((num_read = read(fd, (void *) buf, sizeof(buf)) > 0) {
+    while ((num_read = read(fd, (void *) buf, sizeof(stack_buf))) > 0) {
+
         ssize_t num_written = 0;
         while ((num_written = write(conn_fd, (void *) (buf + num_written), num_read)) > 0) {
+            *sent_bytes += num_written;
             num_read -= num_written;
             if (num_read == 0) {
                 break;
@@ -436,14 +441,14 @@ idevice_error_t idevice_connection_sendfile(idevice_connection_t connection, int
             }
         }
         if (num_written < 0) {
-           debug_info("ERROR: write(%d,,): %s", conn_fd, strerror(errno));
+           debug_info("ERROR: write(%d,,) failed in "__func__": %s", conn_fd, strerror(errno));
            return IDEVICE_E_UNKNOWN_ERROR;
         }
     }
 
-    if (num_read == 0) {
+    if (num_read == 0 && *sent_bytes == length) {
         return IDEVICE_E_SUCCESS;
-    } else (num_read < 0) {
+    } else {
         // must be a read error, write errors return from inner while loop
         debug_info("ERROR: read(%d,,): %s", fd, strerror(errno));
         return IDEVICE_E_UNKNOWN_ERROR;
