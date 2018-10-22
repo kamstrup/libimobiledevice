@@ -57,4 +57,6 @@ int plist_write_to_filename(plist_t plist, const char *filename, enum plist_form
 
 void plist_print_to_stream(plist_t plist, FILE* stream);
 
+char *ensure_udid_format(const char *udid);
+
 #endif

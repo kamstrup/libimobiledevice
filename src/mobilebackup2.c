@@ -22,9 +22,11 @@
 #include <plist/plist.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "mobilebackup2.h"
 #include "device_link_service.h"
+#include "common/utils.h"
 #include "common/debug.h"
 
 #define MBACKUP2_VERSION_INT1 300
@@ -328,11 +330,27 @@ LIBIMOBILEDEVICE_API mobilebackup2_error_t mobilebackup2_send_request(mobileback
 	if (!client || !client->parent || !request || !target_identifier)
 		return MOBILEBACKUP2_E_INVALID_ARG;
 
-	plist_t dict = plist_new_dict();
-	plist_dict_set_item(dict, "TargetIdentifier", plist_new_string(target_identifier));
-	if (source_identifier) {
-		plist_dict_set_item(dict, "SourceIdentifier", plist_new_string(source_identifier));
+	plist_t dict = plist_new_dict();  
+	char *target_udid = NULL;
+	
+	if ((target_udid = ensure_udid_format(target_identifier)) == NULL) {
+		plist_free(dict);
+		return MOBILEBACKUP2_E_INVALID_ARG;
 	}
+	plist_dict_set_item(dict, "TargetIdentifier", plist_new_string(target_udid));
+	free(target_udid);
+	target_udid = NULL;
+
+	if (source_identifier) {
+		char *source_udid = NULL;
+		if ((source_udid = ensure_udid_format(source_identifier)) == NULL) {
+			plist_free(dict);
+			return MOBILEBACKUP2_E_INVALID_ARG;
+		}
+		plist_dict_set_item(dict, "SourceIdentifier", plist_new_string(source_udid));
+		free(source_udid);
+	}
+
 	if (options) {
 		plist_dict_set_item(dict, "Options", plist_copy(options));
 	}

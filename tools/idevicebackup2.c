@@ -499,14 +499,19 @@ static int mb2_status_check_snapshot_state(const char *path, const char *udid, c
 {
 	int ret = 0;
 	plist_t status_plist = NULL;
-	char *file_path = string_build_path(path, udid, "Status.plist", NULL);
+	char *fmt_udid = ensure_udid_format(udid);
+	char *file_path = string_build_path(path, fmt_udid, "Status.plist", NULL);
+	free(fmt_udid);
 
 	plist_read_from_filename(&status_plist, file_path);
-	free(file_path);
+	
 	if (!status_plist) {
-		printf("Could not read Status.plist!\n");
+		printf("Could not read %s!\n", file_path);
+		free(file_path);
 		return ret;
 	}
+	free(file_path);
+
 	plist_t node = plist_dict_get_item(status_plist, "SnapshotState");
 	if (node && (plist_get_node_type(node) == PLIST_STRING)) {
 		char* sval = NULL;
@@ -1338,6 +1343,7 @@ int main(int argc, char *argv[])
 	int i;
 	char* udid = NULL;
 	char* source_udid = NULL;
+	int source_udid_set = 0; // Set to != 0 if override by user
 	lockdownd_service_descriptor_t service = NULL;
 	int cmd = -1;
 	int cmd_flags = 0;
@@ -1383,6 +1389,7 @@ int main(int argc, char *argv[])
 				return -1;
 			}
 			source_udid = strdup(argv[i]);
+			source_udid_set = 1;
 			continue;
 		}
 		else if (!strcmp(argv[i], "-i") || !strcmp(argv[i], "--interactive")) {
@@ -1566,7 +1573,12 @@ int main(int argc, char *argv[])
 	}
 
 	if (!source_udid) {
-		source_udid = strdup(udid);
+		// For iPhone XS and newer we put a dash after the first 8 chars in the udid
+		source_udid = ensure_udid_format(udid);
+		if (source_udid == NULL) {
+			printf("Failed to compute source udid!\n");
+			return -1;
+		}
 	}
 
 	uint8_t is_encrypted = 0;
@@ -1580,11 +1592,11 @@ int main(int argc, char *argv[])
 	} else if (cmd != CMD_CLOUD) {
 		/* backup directory must contain an Info.plist */
 		info_path = string_build_path(backup_directory, source_udid, "Info.plist", NULL);
-		if (cmd == CMD_RESTORE || cmd == CMD_UNBACK) {
+    if (cmd == CMD_RESTORE || cmd == CMD_UNBACK) {
 			if (stat(info_path, &st) != 0) {
 				idevice_free(device);
+				printf("ERROR: Backup directory \"%s\" is invalid. No %s found for UDID %s.\n", backup_directory, info_path, source_udid);
 				free(info_path);
-				printf("ERROR: Backup directory \"%s\" is invalid. No Info.plist found for UDID %s.\n", backup_directory, source_udid);
 				return -1;
 			}
 			char* manifest_path = string_build_path(backup_directory, source_udid, "Manifest.plist", NULL);
@@ -1595,9 +1607,9 @@ int main(int argc, char *argv[])
 			plist_read_from_filename(&manifest_plist, manifest_path);
 			if (!manifest_plist) {
 				idevice_free(device);
+        printf("ERROR: Backup directory \"%s\" is invalid. No %s found for UDID %s.\n", backup_directory, manifest_path, source_udid);
 				free(info_path);
 				free(manifest_path);
-				printf("ERROR: Backup directory \"%s\" is invalid. No Manifest.plist found for UDID %s.\n", backup_directory, source_udid);
 				return -1;
 			}
 			node_tmp = plist_dict_get_item(manifest_plist, "IsEncrypted");
@@ -1782,21 +1794,21 @@ checkpoint:
 			case CMD_BACKUP:
 			PRINT_VERBOSE(1, "Starting backup...\n");
 
-			/* make sure backup device sub-directory exists */
-			char* devbackupdir = string_build_path(backup_directory, source_udid, NULL);
-			__mkdir(devbackupdir, 0755);
-			free(devbackupdir);
-
-			if (strcmp(source_udid, udid) != 0) {
-				/* handle different source backup directory */
+			if (source_udid_set) {
+        /* handle different source backup directory */
 				// make sure target backup device sub-directory exists
-				devbackupdir = string_build_path(backup_directory, udid, NULL);
+				char *devbackupdir = string_build_path(backup_directory, udid, NULL);
 				__mkdir(devbackupdir, 0755);
 				free(devbackupdir);
 
 				// use Info.plist path in target backup folder */
 				free(info_path);
 				info_path = string_build_path(backup_directory, udid, "Info.plist", NULL);
+			} else {
+				/* make sure backup device sub-directory exists */
+				char* devbackupdir = string_build_path(backup_directory, source_udid, NULL);
+				__mkdir(devbackupdir, 0755);
+				free(devbackupdir);
 			}
 
 			/* TODO: check domain com.apple.mobile.backup key RequiresEncrypt and WillEncrypt with lockdown */

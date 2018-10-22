@@ -481,3 +481,31 @@ void plist_print_to_stream(plist_t plist, FILE* stream)
 		plist_node_print_to_stream(plist, &indent, stream);
 	}
 }
+
+/**
+ * Ensure a udid is formatted with a dash after the 8th character.
+ * Allocates a new string stored in *out_udid on success.
+ */
+char *ensure_udid_format(const char *udid)
+{
+  if (udid == NULL) {
+    return NULL;
+  }
+
+  size_t len = strlen(udid);
+  if (len < 8) {
+    return NULL;
+  } else if (len == 40) {
+    return strdup(udid);
+  } else {
+    // New style udid (iPhone XS or newer)
+    if (udid[8] == '-') {
+      return strdup(udid);
+    }
+
+    // Insert dash after 8 chars
+    char *new_udid = malloc(len + 2);
+    snprintf(new_udid, len + 2, "%.8s-%s", udid, udid+8);
+    return new_udid;
+  }
+}
